@@ -17,7 +17,7 @@ inductive Formula (α : Type _)
 | Iff (f₁ f₂ : Formula α)
 | Forall (s : String) (f : Formula α)
 | Exists (s : String) (f : Formula α)
-deriving Inhabited, Repr, BEq
+deriving Inhabited, Repr, BEq, DecidableEq
 
 /--
 Only defined so that we can use Lex order for an ordering, do *not* use in general
@@ -99,7 +99,7 @@ partial def parseAtomicFormula (ifn afn : List String → List String → Option
 | "false" :: rest => Result.Ok (Formula.False, rest)
 | "true" :: rest => Result.Ok (Formula.True, rest)
 | "(" :: rest =>
-  ifn vs rest |>.orElse (λ _ => parseBracketed (parseFormula ifn afn vs) ")" rest)
+  ifn vs rest |>.orElse λ _ => parseBracketed (parseFormula ifn afn vs) ")" rest
 | "~" :: rest => 
   parseAtomicFormula ifn afn vs rest |>.map <| papply Formula.Not
 | "forall" :: x :: rest =>

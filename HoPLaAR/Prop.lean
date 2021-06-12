@@ -395,7 +395,7 @@ def allSatValuations [BEq α] (subfn : (α → Bool) → Optional Bool) (v : α 
     allSatValuations subfn (v' false) ps
     ++ allSatValuations subfn (v' true) ps
 
-def dnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] (fm : Formula α) : Optional (Formula α) :=
+def dnf' [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] (fm : Formula α) : Optional (Formula α) :=
   let pvs := atoms fm
   let satVals := allSatValuations (eval fm) (λ _ => false) pvs
   satVals.map <| λ l => l.map (mkLits (List.map (λ p => Formula.Atom p) pvs)) |> listDisj
@@ -407,11 +407,11 @@ def dnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabite
 namespace hidden
 private def fm := parsePropFormula "(p \\/ q /\\ r) /\\ (~p \\/ ~r)"
 
-#eval fm.andThen dnf |>.map printPropFormula
+#eval fm.andThen dnf' |>.map printPropFormula
 
 #eval fm.andThen printTruthTable
 
-#eval parsePropFormula "p /\\ q /\\ r /\\ s /\\ t /\\ u \\/ u /\\ v" |>.andThen dnf |>.map printPropFormula
+#eval parsePropFormula "p /\\ q /\\ r /\\ s /\\ t /\\ u \\/ u /\\ v" |>.andThen dnf' |>.map printPropFormula
 end hidden
 
 -- (* ------------------------------------------------------------------------- *)
@@ -471,46 +471,67 @@ def trivialDisj [BEq α] [ToString α] (lits : List (Formula α)) : Bool :=
 -- (* With subsumption checking, done very naively (quadratic).                 *)
 -- (* ------------------------------------------------------------------------- *)
 
--- let simpdnf fm =
---   if fm = False then [] else if fm = True then [[]] else
---   let djs = filter (non trivial) (purednf(nnf fm)) in
---   filter (fun d -> not(exists (fun d' -> psubset d' d) djs)) djs
+def simpDnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] [ToString α] (fm : Formula α) : List (List (Formula α)) :=
+  if fm == Formula.False then
+    []
+  else if fm == Formula.True then
+    [[]]
+  else
+    let djs := nnf fm |> pureDnf |>.filter (non trivialDisj)
+    djs.filter λ d => !(djs.any λ d' => psubset d' d)
 
 -- (* ------------------------------------------------------------------------- *)
 -- (* Mapping back to a formula.                                                *)
 -- (* ------------------------------------------------------------------------- *)
 
--- let dnf fm = list_disj(map list_conj (simpdnf fm))
+def dnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] [ToString α] (fm : Formula α) : Formula α :=
+  simpDnf fm |>.map listConj |> listDisj
 
 -- (* ------------------------------------------------------------------------- *)
 -- (* Example.                                                                  *)
 -- (* ------------------------------------------------------------------------- *)
 
 -- START_INTERACTIVE
--- let fm = "(p \\/ q /\\ r) /\\ (~p \\/ ~r)"
--- dnf fm
--- tautology(Iff(fm,dnf fm))
--- END_INTERACTIVE
+namespace hidden
+
+private def fm₁ := parsePropFormula "(p \\/ q /\\ r) /\\ (~p \\/ ~r)"
+
+#eval fm₁
+
+#eval fm₁.map dnf
+
+#eval fm₁.map (λ x => (x, dnf x)) |>.andThen (λ s => tautology <| Formula.Iff s.1 s.2)
+
+end hidden
 
 -- (* ------------------------------------------------------------------------- *)
 -- (* Conjunctive normal form (CNF) by essentially the same code.               *)
 -- (* ------------------------------------------------------------------------- *)
 
--- let purecnf fm = image (image negate) (purednf(nnf(Not fm)))
+def pureCnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] [ToString α] (fm : Formula α) : List (List (Formula α)) :=
+Formula.Not fm |> pureDnf |> image (image negate)
 
--- let simpcnf fm =
---   if fm = False then [[]] else if fm = True then [] else
---   let cjs = filter (non trivial) (purecnf fm) in
---   filter (fun c -> not(exists (fun c' -> psubset c' c) cjs)) cjs
+def simpCnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] [ToString α] (fm : Formula α) : List (List (Formula α)) :=
+  if fm == Formula.False then
+    [[]]
+  else if fm == Formula.True then
+    []
+  else
+    let cjs := pureCnf fm |>.filter (non trivialDisj)
+    cjs.filter λ c => !cjs.any λ c' => psubset c' c
 
--- let cnf fm = list_conj(map list_disj (simpcnf fm))
+def cnf [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] [ToString α] (fm : Formula α) : Formula α :=
+  simpCnf fm |>.map listDisj |> listConj
 
 -- (* ------------------------------------------------------------------------- *)
 -- (* Example.                                                                  *)
 -- (* ------------------------------------------------------------------------- *)
 
--- START_INTERACTIVE
--- let fm = "(p \\/ q /\\ r) /\\ (~p \\/ ~r)"
--- cnf fm
--- tautology(Iff(fm,cnf fm))
--- END_INTERACTIVE
+namespace hidden
+def fm₂ := parsePropFormula "(p \\/ q /\\ r) /\\ (~p \\/ ~r)"
+
+#eval fm₂.map cnf
+
+#eval fm₁.map (λ x => (x, cnf x)) |>.andThen (λ s => tautology <| Formula.Iff s.1 s.2)
+
+end hidden

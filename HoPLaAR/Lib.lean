@@ -298,25 +298,35 @@ def intersect [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [In
 --           else subtract l1 t2 in
 --   fun s1 s2 -> subtract (setify s1) (setify s2);;
 
--- let subset,psubset =
---   let rec subset l1 l2 =
---     match (l1,l2) with
---         ([],l2) -> true
---       | (l1,[]) -> false
---       | (h1::t1,h2::t2) ->
---           if h1 = h2 then subset t1 t2
---           else if h1 < h2 then false
---           else subset l1 t2
---   and psubset l1 l2 =
---     match (l1,l2) with
---         (l1,[]) -> false
---       | ([],l2) -> true
---       | (h1::t1,h2::t2) ->
---           if h1 = h2 then psubset t1 t2
---           else if h1 < h2 then false
---           else subset l1 t2 in
---   (fun s1 s2 -> subset (setify s1) (setify s2)),
---   (fun s1 s2 -> psubset (setify s1) (setify s2));;
+def subsetAux [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] (l₁ l₂ : List α) : Bool :=
+  match l₁, l₂ with
+  | [], _ => true
+  | _, [] => false
+  | h₁ :: t₁, h₂ :: t₂ =>
+    if h₁ == h₂ then
+      subsetAux t₁ t₂
+    else if h₁ < h₂ then
+      false
+    else
+      subsetAux l₁ t₂ 
+
+def psubsetAux [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] (l₁ l₂ : List α) : Bool :=
+  match l₁, l₂ with
+  | _, [] => false
+  | [], _ => true
+  | h₁ :: t₁, h₂ :: t₂ =>
+    if h₁ == h₂ then
+      psubsetAux t₁ t₂
+    else if h₁ < h₂ then
+      false
+    else
+      subsetAux l₁ t₂ 
+  
+def subset [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] (l₁ l₂ : List α) : Bool :=
+  subsetAux (setify l₁) (setify l₂)
+
+def psubset [BEq α] [LT α] [DecidableRel (· < · : α → α → Prop)] [Inhabited α] (l₁ l₂ : List α) : Bool :=
+  psubsetAux (setify l₁) (setify l₂)
 
 -- let rec set_eq s1 s2 = (setify s1 = setify s2);;
 
